@@ -1,32 +1,33 @@
 using System.Text;
+using Spectre.Console;
+using TargetPlantao.Cli.Localization;
 using TargetPlantao.Cli.Screens;
 using TargetPlantao.Cli.Ui;
 using TargetPlantao.Core.Commissions;
 using TargetPlantao.Core.Interest;
 using TargetPlantao.Core.Inventory;
-using Spectre.Console;
 
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;
 
-var console = AnsiConsole.Console;
+var terminal = new Terminal(AnsiConsole.Console, args.Contains("--en") ? Locale.English : Locale.Portuguese);
 var clock = TimeProvider.System;
 
 try
 {
     IScreen[] screens =
     [
-        new CommissionScreen(console, CommissionPolicy.Default, Load("vendas.json", SalesJsonReader.Read)),
-        new InventoryScreen(console, new Warehouse(Load("estoque.json", StockJsonReader.Read), clock)),
-        new LateInterestScreen(console, new LateInterestCalculator(clock)),
+        new CommissionScreen(terminal, CommissionPolicy.Default, Load("vendas.json", SalesJsonReader.Read)),
+        new InventoryScreen(terminal, new Warehouse(Load("estoque.json", StockJsonReader.Read), clock)),
+        new LateInterestScreen(terminal, new LateInterestCalculator(clock)),
     ];
 
-    new MainMenu(console, screens).Run();
+    new MainMenu(terminal, screens).Run();
     return 0;
 }
 catch (Exception error) when (error is IOException or System.Text.Json.JsonException)
 {
-    console.Error($"não foi possível carregar os dados: {error.Message}");
+    terminal.Error(terminal.Text.LoadFailed(error.Message));
     return 1;
 }
 

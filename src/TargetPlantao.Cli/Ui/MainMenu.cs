@@ -5,7 +5,7 @@ using static TargetPlantao.Cli.Ui.Theme;
 
 namespace TargetPlantao.Cli.Ui;
 
-internal sealed class MainMenu(IAnsiConsole console, IReadOnlyList<IScreen> screens)
+internal sealed class MainMenu(Terminal terminal, IReadOnlyList<IScreen> screens)
 {
     private const string About = "Vinícius Nicoluci Espíndola  ·  github.com/Vininic  ·  C# / .NET 8";
 
@@ -19,7 +19,7 @@ internal sealed class MainMenu(IAnsiConsole console, IReadOnlyList<IScreen> scre
             screens[choice].Show();
         }
 
-        console.Clear();
+        terminal.Console.Clear();
     }
 
     private int? Choose(int initial)
@@ -28,8 +28,8 @@ internal sealed class MainMenu(IAnsiConsole console, IReadOnlyList<IScreen> scre
         var index = initial;
         int? chosen = null;
 
-        console.Header();
-        console.Live(Render(index))
+        terminal.Header();
+        terminal.Console.Live(Render(index))
             .AutoClear(true)
             .Start(context =>
             {
@@ -37,7 +37,7 @@ internal sealed class MainMenu(IAnsiConsole console, IReadOnlyList<IScreen> scre
 
                 while (chosen is null)
                 {
-                    if (console.Input.ReadKey(intercept: true) is not { } key)
+                    if (terminal.Console.Input.ReadKey(intercept: true) is not { } key)
                         continue;
 
                     var letter = char.ToLowerInvariant(key.KeyChar);
@@ -48,6 +48,8 @@ internal sealed class MainMenu(IAnsiConsole console, IReadOnlyList<IScreen> scre
                         index = (index + 1) % (exitIndex + 1);
                     else if (key.Key == ConsoleKey.Enter)
                         chosen = index;
+                    else if (letter == 'l')
+                        terminal.ToggleLanguage();
                     else if (key.Key == ConsoleKey.Escape || letter == 'q')
                         chosen = exitIndex;
                     else if (letter - '1' is var shortcut && shortcut >= 0 && shortcut < exitIndex)
@@ -79,13 +81,13 @@ internal sealed class MainMenu(IAnsiConsole console, IReadOnlyList<IScreen> scre
         }
 
         var exitSelected = selected == screens.Count;
-        options.AddRow(exitSelected ? Paint(Accent, "▸") : " ", Paint(exitSelected ? Gold : Muted, "q"), Paint(exitSelected ? Soft : Muted, "sair"), "");
+        options.AddRow(exitSelected ? Paint(Accent, "▸") : " ", Paint(exitSelected ? Gold : Muted, "q"), Paint(exitSelected ? Soft : Muted, terminal.Text.Quit), "");
 
         IRenderable[] lines =
         [
             options,
             Text.Empty,
-            new Markup($"  {Paint(Muted, $"↑↓ navegar  ·  enter abrir  ·  1-{screens.Count} atalho  ·  q sair")}"),
+            new Markup($"  {Paint(Muted, terminal.Text.MenuHint(screens.Count))}"),
             Text.Empty,
             new Rule().RuleStyle(LineStyle),
             new Markup($"  {Paint(Muted, About)}"),

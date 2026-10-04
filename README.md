@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/Vininic/desafio-target-plantao/actions/workflows/ci.yml/badge.svg)](https://github.com/Vininic/desafio-target-plantao/actions/workflows/ci.yml)
 
-C# / .NET 8 · Spectre.Console · xUnit
+C# / .NET 8 · Spectre.Console · xUnit · [English](README.en.md)
 
 ![menu](docs/menu.png)
 
@@ -15,6 +15,8 @@ dotnet run --project src/TargetPlantao.Cli
 ```bash
 dotnet test
 ```
+
+Inglês: tecla `l` no menu ou `-- --en` ao rodar.
 
 ## 1. Comissões
 
@@ -46,7 +48,7 @@ Juros de 2,5% ao dia sobre o valor vencido, calculados para hoje: `valor × 2,5%
 
 ```
 src/TargetPlantao.Core    regras de negócio
-src/TargetPlantao.Cli     interface de terminal e JSONs do enunciado
+src/TargetPlantao.Cli     interface de terminal, traduções e JSONs do enunciado
 tests/TargetPlantao.Tests testes das regras e das telas
 ```
 

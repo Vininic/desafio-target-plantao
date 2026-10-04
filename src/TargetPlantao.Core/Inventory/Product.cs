@@ -30,7 +30,7 @@ public sealed class Product
         };
 
         if (newQuantity < 0)
-            throw new DomainException($"Estoque insuficiente: {Description} tem {Quantity} un.");
+            throw new DomainException(new DomainError.InsufficientStock(Description, Quantity));
 
         Quantity = newQuantity;
     }

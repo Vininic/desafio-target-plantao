@@ -1,9 +1,10 @@
+using Spectre.Console.Testing;
+using TargetPlantao.Cli.Localization;
 using TargetPlantao.Cli.Screens;
 using TargetPlantao.Cli.Ui;
 using TargetPlantao.Core.Commissions;
 using TargetPlantao.Core.Interest;
 using TargetPlantao.Core.Inventory;
-using Spectre.Console.Testing;
 
 namespace TargetPlantao.Tests.Cli;
 
@@ -17,7 +18,7 @@ public sealed class ScreenFlowTests : IDisposable
     public void Commission_screen_ranks_the_sellers_and_opens_the_detail_of_one()
     {
         using var json = Open("vendas.json");
-        var screen = new CommissionScreen(_console, CommissionPolicy.Default, SalesJsonReader.Read(json));
+        var screen = new CommissionScreen(Portuguese(), CommissionPolicy.Default, SalesJsonReader.Read(json));
 
         _console.Input.PushKey(ConsoleKey.Enter);
         _console.Input.PushKey(ConsoleKey.Enter);
@@ -33,7 +34,7 @@ public sealed class ScreenFlowTests : IDisposable
     public void Inventory_screen_registers_an_outbound_movement_and_shows_the_final_stock()
     {
         var warehouse = new Warehouse([new Product(101, "Caneta Azul", 150)], TimeProvider.System);
-        var screen = new InventoryScreen(_console, warehouse);
+        var screen = new InventoryScreen(Portuguese(), warehouse);
 
         _console.Input.PushKey(ConsoleKey.Enter);
         _console.Input.PushKey(ConsoleKey.Enter);
@@ -58,7 +59,7 @@ public sealed class ScreenFlowTests : IDisposable
     public void Inventory_screen_shows_the_domain_error_when_stock_is_insufficient()
     {
         var warehouse = new Warehouse([new Product(101, "Caneta Azul", 5)], TimeProvider.System);
-        var screen = new InventoryScreen(_console, warehouse);
+        var screen = new InventoryScreen(Portuguese(), warehouse);
 
         _console.Input.PushKey(ConsoleKey.Enter);
         _console.Input.PushKey(ConsoleKey.Enter);
@@ -71,14 +72,33 @@ public sealed class ScreenFlowTests : IDisposable
         screen.Show();
 
         Assert.Empty(warehouse.Movements);
-        Assert.Contains("Estoque insuficiente", _console.Output, StringComparison.Ordinal);
+        Assert.Contains("Estoque insuficiente: Caneta Azul tem 5 un.", _console.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Inventory_screen_works_in_english()
+    {
+        var warehouse = new Warehouse([new Product(101, "Caneta Azul", 5)], TimeProvider.System);
+        var screen = new InventoryScreen(English(), warehouse);
+
+        _console.Input.PushKey(ConsoleKey.Enter);
+        _console.Input.PushKey(ConsoleKey.Enter);
+        _console.Input.PushKey(ConsoleKey.DownArrow);
+        _console.Input.PushKey(ConsoleKey.Enter);
+        _console.Input.PushTextWithEnter("6");
+        _console.Input.PushTextWithEnter("Sale");
+        _console.Input.PushKey(ConsoleKey.Enter);
+        _console.Input.PushKey(ConsoleKey.Escape);
+        screen.Show();
+
+        Assert.Contains("new movement", _console.Output, StringComparison.Ordinal);
+        Assert.Contains("Insufficient stock: Caneta Azul has 5 units.", _console.Output, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Late_interest_screen_reprompts_invalid_input_and_shows_the_quote()
     {
-        var clock = ClockAt(new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero));
-        var screen = new LateInterestScreen(_console, new LateInterestCalculator(clock));
+        var screen = new LateInterestScreen(Portuguese(), new LateInterestCalculator(Clock()));
 
         _console.Input.PushTextWithEnter("abc");
         _console.Input.PushTextWithEnter("1.000,00");
@@ -95,6 +115,21 @@ public sealed class ScreenFlowTests : IDisposable
     }
 
     [Fact]
+    public void Late_interest_screen_reads_and_formats_english_input()
+    {
+        var screen = new LateInterestScreen(English(), new LateInterestCalculator(Clock()));
+
+        _console.Input.PushTextWithEnter("1,000.00");
+        _console.Input.PushTextWithEnter("09/23/2026");
+        _console.Input.PushKey(ConsoleKey.Escape);
+        screen.Show();
+
+        Assert.Contains("today 10/03/2026", _console.Output, StringComparison.Ordinal);
+        Assert.Contains("2.5% × 10 days", _console.Output, StringComparison.Ordinal);
+        Assert.Contains("R$ 1,250.00", _console.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Main_menu_opens_screens_by_arrows_and_shortcuts_and_quits_with_q()
     {
         var first = new RecordingScreen("primeira");
@@ -104,12 +139,32 @@ public sealed class ScreenFlowTests : IDisposable
         _console.Input.PushKey(ConsoleKey.Enter);
         _console.Input.PushCharacter('1');
         _console.Input.PushCharacter('q');
-        new MainMenu(_console, [first, second]).Run();
+        new MainMenu(Portuguese(), [first, second]).Run();
 
         Assert.Equal(1, first.Opened);
         Assert.Equal(1, second.Opened);
         Assert.Contains("github.com/Vininic", _console.Output, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Main_menu_switches_language_with_l()
+    {
+        var terminal = Portuguese();
+
+        _console.Input.PushCharacter('l');
+        _console.Input.PushCharacter('q');
+        new MainMenu(terminal, [new RecordingScreen("tela")]).Run();
+
+        Assert.Same(Locale.English, terminal.Locale);
+        Assert.Contains("q sair", _console.Output, StringComparison.Ordinal);
+        Assert.Contains("q quit", _console.Output, StringComparison.Ordinal);
+    }
+
+    private Terminal Portuguese() => new(_console, Locale.Portuguese);
+
+    private Terminal English() => new(_console, Locale.English);
+
+    private static TimeProvider Clock() => ClockAt(new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero));
 
     private sealed class RecordingScreen(string title) : IScreen
     {
@@ -117,7 +172,7 @@ public sealed class ScreenFlowTests : IDisposable
 
         public string Title => title;
 
-        public string Summary => "tela de teste";
+        public string Summary => title;
 
         public void Show() => Opened++;
     }

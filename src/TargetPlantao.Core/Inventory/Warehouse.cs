@@ -27,13 +27,13 @@ public sealed class Warehouse
     public StockMovement Register(MovementRequest request)
     {
         if (request.Quantity <= 0)
-            throw new DomainException("Quantidade deve ser maior que zero.");
+            throw new DomainException(new DomainError.NonPositiveQuantity());
 
         if (string.IsNullOrWhiteSpace(request.Description))
-            throw new DomainException("Descrição obrigatória.");
+            throw new DomainException(new DomainError.MissingDescription());
 
         if (!_products.TryGetValue(request.ProductCode, out var product))
-            throw new DomainException($"Produto {request.ProductCode} não encontrado.");
+            throw new DomainException(new DomainError.ProductNotFound(request.ProductCode));
 
         var previousQuantity = product.Quantity;
         product.Apply(request.Type, request.Quantity);

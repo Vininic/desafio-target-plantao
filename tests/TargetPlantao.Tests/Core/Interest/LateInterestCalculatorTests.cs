@@ -70,7 +70,9 @@ public class LateInterestCalculatorTests
     [InlineData(-10)]
     public void Non_positive_amount_is_rejected(int amount)
     {
-        Assert.Throws<DomainException>(() => _calculator.Calculate(amount, Today));
+        var error = Assert.Throws<DomainException>(() => _calculator.Calculate(amount, Today));
+
+        Assert.IsType<DomainError.NonPositiveAmount>(error.Error);
     }
 
     private static TimeProvider ClockAt(DateOnly date) =>

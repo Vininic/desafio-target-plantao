@@ -36,7 +36,7 @@ public sealed class LateInterestCalculator
     public LateInterestQuote Calculate(decimal amount, DateOnly dueDate)
     {
         if (amount <= 0)
-            throw new DomainException("Valor deve ser maior que zero.");
+            throw new DomainException(new DomainError.NonPositiveAmount());
 
         var today = Today;
         var daysOverdue = Math.Max(0, today.DayNumber - dueDate.DayNumber);

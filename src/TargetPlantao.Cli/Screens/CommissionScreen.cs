@@ -1,30 +1,33 @@
+using Spectre.Console;
+using TargetPlantao.Cli.Localization;
 using TargetPlantao.Cli.Ui;
 using TargetPlantao.Core.Commissions;
-using Spectre.Console;
 using static TargetPlantao.Cli.Ui.Theme;
 
 namespace TargetPlantao.Cli.Screens;
 
-internal sealed class CommissionScreen(IAnsiConsole console, CommissionPolicy policy, IReadOnlyList<Sale> sales) : IScreen
+internal sealed class CommissionScreen(Terminal terminal, CommissionPolicy policy, IReadOnlyList<Sale> sales) : IScreen
 {
-    private const string Section = "01 · comissões";
-
     private readonly IReadOnlyList<SellerCommission> _summaries = new CommissionCalculator(policy).CalculateBySeller(sales);
 
-    public string Title => "Comissões de vendas";
+    private Locale Locale => terminal.Locale;
 
-    public string Summary => "comissão por vendedor";
+    private CommissionStrings Text => terminal.Text.Commission;
+
+    public string Title => Text.Title;
+
+    public string Summary => Text.Summary;
 
     public void Show()
     {
         while (true)
         {
-            console.Header(Section);
-            console.Hint(PolicyDescription());
-            console.WriteLine();
-            console.Indented(SummaryTable());
+            terminal.Header(Text.Section);
+            terminal.Hint(PolicyDescription());
+            terminal.NewLine();
+            terminal.Show(SummaryTable());
 
-            if (!console.TryChoose(_summaries, s => Paint(Bright, s.Seller), out var seller))
+            if (!terminal.TryChoose(_summaries, s => Paint(Bright, s.Seller), out var seller))
                 return;
 
             ShowSeller(seller);
@@ -33,37 +36,39 @@ internal sealed class CommissionScreen(IAnsiConsole console, CommissionPolicy po
 
     private void ShowSeller(SellerCommission seller)
     {
-        console.Header(Section, seller.Seller);
+        terminal.Header(Text.Section, seller.Seller);
 
         var table = NewTable()
             .ShowFooters()
             .AddColumn(Column("#", alignRight: true))
-            .AddColumn(Column("Venda", alignRight: true, footer: Paint(Soft, Format.Currency(seller.TotalSold))))
-            .AddColumn(Column("Faixa", alignRight: true))
-            .AddColumn(Column("Comissão", alignRight: true, footer: Paint(Gold, Format.Currency(seller.TotalCommission))));
+            .AddColumn(Column(Text.Sale, alignRight: true, footer: Paint(Soft, Locale.Currency(seller.TotalSold))))
+            .AddColumn(Column(Text.Tier, alignRight: true))
+            .AddColumn(Column(Text.Commission, alignRight: true, footer: Paint(Gold, Locale.Currency(seller.TotalCommission))));
 
         foreach (var (line, index) in seller.Sales.Select((line, index) => (line, index + 1)))
         {
             table.AddRow(
                 Paint(Muted, index),
-                Paint(Bright, Format.Currency(line.Sale.Amount)),
+                Paint(Bright, Locale.Currency(line.Sale.Amount)),
                 RateLabel(line.Rate),
-                line.Commission == 0 ? Paint(Muted, "—") : Paint(Bright, Format.Currency(line.Commission)));
+                line.Commission == 0 ? Paint(Muted, "—") : Paint(Bright, Locale.Currency(line.Commission)));
         }
 
-        console.Indented(table);
-        console.WaitForBack();
+        terminal.Show(table);
+        terminal.WaitForBack();
     }
 
     private Table SummaryTable()
     {
+        var tiers = string.Join(" · ", policy.Tiers.Select(t => Locale.Percent(t.Rate)));
+
         var table = NewTable()
             .ShowFooters()
-            .AddColumn(Column("Vendedor", footer: Paint(Soft, "Total")))
-            .AddColumn(Column("Vendas", alignRight: true, footer: Paint(Soft, _summaries.Sum(s => s.Sales.Count))))
-            .AddColumn(Column($"Por faixa ({string.Join(" · ", policy.Tiers.Select(t => Format.Percent(t.Rate)))})", alignRight: true))
-            .AddColumn(Column("Total vendido", alignRight: true, footer: Paint(Soft, Format.Currency(_summaries.Sum(s => s.TotalSold)))))
-            .AddColumn(Column("Comissão", alignRight: true, footer: Paint(Gold, Format.Currency(_summaries.Sum(s => s.TotalCommission)))));
+            .AddColumn(Column(Text.Seller, footer: Paint(Soft, Text.Total)))
+            .AddColumn(Column(Text.Sales, alignRight: true, footer: Paint(Soft, _summaries.Sum(s => s.Sales.Count))))
+            .AddColumn(Column($"{Text.ByTier} ({tiers})", alignRight: true))
+            .AddColumn(Column(Text.TotalSold, alignRight: true, footer: Paint(Soft, Locale.Currency(_summaries.Sum(s => s.TotalSold)))))
+            .AddColumn(Column(Text.Commission, alignRight: true, footer: Paint(Gold, Locale.Currency(_summaries.Sum(s => s.TotalCommission)))));
 
         foreach (var seller in _summaries)
         {
@@ -73,8 +78,8 @@ internal sealed class CommissionScreen(IAnsiConsole console, CommissionPolicy po
                 Paint(Bright, seller.Seller),
                 Paint(Muted, seller.Sales.Count),
                 Paint(Muted, string.Join(" · ", salesPerTier)),
-                Paint(Bright, Format.Currency(seller.TotalSold)),
-                Paint(Gold, Format.Currency(seller.TotalCommission)));
+                Paint(Bright, Locale.Currency(seller.TotalSold)),
+                Paint(Gold, Locale.Currency(seller.TotalCommission)));
         }
 
         return table;
@@ -84,8 +89,8 @@ internal sealed class CommissionScreen(IAnsiConsole console, CommissionPolicy po
     {
         var tiers = policy.Tiers;
         var rules = tiers.Select((tier, i) => i == 0 && tiers.Count > 1
-            ? $"< {Format.Currency(tiers[1].MinimumAmount)} → {Format.Percent(tier.Rate)}"
-            : $"≥ {Format.Currency(tier.MinimumAmount)} → {Format.Percent(tier.Rate)}");
+            ? $"< {Locale.Currency(tiers[1].MinimumAmount)} → {Locale.Percent(tier.Rate)}"
+            : $"≥ {Locale.Currency(tier.MinimumAmount)} → {Locale.Percent(tier.Rate)}");
 
         return string.Join("  ·  ", rules);
     }
@@ -93,6 +98,6 @@ internal sealed class CommissionScreen(IAnsiConsole console, CommissionPolicy po
     private string RateLabel(decimal rate)
     {
         var color = rate == 0 ? Muted : rate == policy.Tiers[^1].Rate ? Gold : Soft;
-        return Paint(color, Format.Percent(rate));
+        return Paint(color, Locale.Percent(rate));
     }
 }

@@ -60,7 +60,7 @@ public class WarehouseTests
         var error = Assert.Throws<DomainException>(
             () => _warehouse.Register(new MovementRequest(102, MovementType.Outbound, 76, "Venda")));
 
-        Assert.Contains("Estoque insuficiente", error.Message, StringComparison.Ordinal);
+        Assert.Equal(new DomainError.InsufficientStock("Caderno Universitário", 75), error.Error);
         Assert.Equal(75, Stock(102));
         Assert.Empty(_warehouse.Movements);
     }
@@ -77,16 +77,16 @@ public class WarehouseTests
     }
 
     [Theory]
-    [InlineData(999, 10, "Venda", "não encontrado")]
-    [InlineData(101, 0, "Venda", "maior que zero")]
-    [InlineData(101, -5, "Venda", "maior que zero")]
-    [InlineData(101, 10, "   ", "Descrição")]
-    public void Invalid_requests_are_rejected(int productCode, int quantity, string description, string expectedMessage)
+    [InlineData(999, 10, "Venda", typeof(DomainError.ProductNotFound))]
+    [InlineData(101, 0, "Venda", typeof(DomainError.NonPositiveQuantity))]
+    [InlineData(101, -5, "Venda", typeof(DomainError.NonPositiveQuantity))]
+    [InlineData(101, 10, "   ", typeof(DomainError.MissingDescription))]
+    public void Invalid_requests_are_rejected(int productCode, int quantity, string description, Type expectedError)
     {
         var error = Assert.Throws<DomainException>(
             () => _warehouse.Register(new MovementRequest(productCode, MovementType.Inbound, quantity, description)));
 
-        Assert.Contains(expectedMessage, error.Message, StringComparison.Ordinal);
+        Assert.IsType(expectedError, error.Error);
         Assert.Empty(_warehouse.Movements);
     }
 

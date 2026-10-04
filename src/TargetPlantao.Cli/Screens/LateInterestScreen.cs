@@ -1,65 +1,62 @@
+using Spectre.Console;
+using TargetPlantao.Cli.Localization;
 using TargetPlantao.Cli.Ui;
 using TargetPlantao.Core.Common;
 using TargetPlantao.Core.Interest;
-using Spectre.Console;
 using static TargetPlantao.Cli.Ui.Theme;
 
 namespace TargetPlantao.Cli.Screens;
 
-internal sealed class LateInterestScreen(IAnsiConsole console, LateInterestCalculator calculator) : IScreen
+internal sealed class LateInterestScreen(Terminal terminal, LateInterestCalculator calculator) : IScreen
 {
-    private const string Section = "03 · juros";
-    private const string CalculateAgain = "novo cálculo";
+    private Locale Locale => terminal.Locale;
 
-    public string Title => "Juros por atraso";
+    private InterestStrings Text => terminal.Text.Interest;
 
-    public string Summary => $"{Format.Percent(calculator.DailyRate)} ao dia";
+    public string Title => Text.Title;
+
+    public string Summary => Text.Summary(Locale.Percent(calculator.DailyRate));
 
     public void Show()
     {
         do
         {
-            console.Header(Section);
-            console.Hint($"hoje {Format.Date(calculator.Today)}  ·  {Format.Percent(calculator.DailyRate)} ao dia");
-            console.WriteLine();
+            terminal.Header(Text.Section);
+            terminal.Hint(Text.Today(Locale.Date(calculator.Today), Locale.Percent(calculator.DailyRate)));
+            terminal.NewLine();
 
-            var amount = console.Ask<decimal>("valor:", InputParser.TryParseMoney, "valor inválido");
-            var dueDate = console.Ask<DateOnly>("vencimento (dd/mm/aaaa):", InputParser.TryParseDate, "data inválida");
+            var amount = terminal.Ask<decimal>(Text.AmountPrompt, Locale.TryParseMoney, Text.InvalidAmount);
+            var dueDate = terminal.Ask<DateOnly>(Text.DueDatePrompt, Locale.TryParseDate, Text.InvalidDate);
 
-            console.WriteLine();
+            terminal.NewLine();
             try
             {
-                console.Indented(QuoteTable(calculator.Calculate(amount, dueDate)));
+                terminal.Show(QuoteTable(calculator.Calculate(amount, dueDate)));
             }
             catch (DomainException error)
             {
-                console.Error(error.Message);
+                terminal.Error(terminal.Text.Error(error.Error));
             }
         }
-        while (console.TryChoose<string>([CalculateAgain], label => Paint(Bright, label), out _));
+        while (terminal.TryChoose<string>([Text.NewCalculation], label => Paint(Bright, label), out _));
     }
 
-    private static Table QuoteTable(LateInterestQuote quote)
+    private Table QuoteTable(LateInterestQuote quote)
     {
         var table = NewTable()
             .HideHeaders()
             .ShowFooters()
-            .AddColumn(Column("", footer: Paint(Soft, "total atualizado")))
-            .AddColumn(Column("", alignRight: true, footer: Paint(Gold, Format.Currency(quote.UpdatedAmount))));
+            .AddColumn(Column("", footer: Paint(Soft, Text.UpdatedTotal)))
+            .AddColumn(Column("", alignRight: true, footer: Paint(Gold, Locale.Currency(quote.UpdatedAmount))));
 
-        table.AddRow(Paint(Muted, "valor original"), Paint(Bright, Format.Currency(quote.Amount)));
-        table.AddRow(Paint(Muted, "vencimento"), Paint(Bright, Format.Date(quote.DueDate)));
-        table.AddRow(Paint(Muted, "dias em atraso"), Paint(Bright, quote.DaysOverdue));
+        table.AddRow(Paint(Muted, Text.OriginalAmount), Paint(Bright, Locale.Currency(quote.Amount)));
+        table.AddRow(Paint(Muted, Text.DueDate), Paint(Bright, Locale.Date(quote.DueDate)));
+        table.AddRow(Paint(Muted, Text.DaysOverdue), Paint(Bright, quote.DaysOverdue));
 
         if (quote.IsOverdue)
-        {
-            var formula = $"juros ({Format.Percent(quote.DailyRate)} × {quote.DaysOverdue} dias)";
-            table.AddRow(Paint(Muted, formula), Paint(Gold, Format.Currency(quote.Interest)));
-        }
+            table.AddRow(Paint(Muted, Text.Formula(Locale.Percent(quote.DailyRate), quote.DaysOverdue)), Paint(Gold, Locale.Currency(quote.Interest)));
         else
-        {
-            table.AddRow(Paint(Muted, "juros"), Paint(Soft, "sem juros"));
-        }
+            table.AddRow(Paint(Muted, Text.Interest), Paint(Soft, Text.NoInterest));
 
         return table;
     }
